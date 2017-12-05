@@ -1,0 +1,7 @@
+*.pyc
+*.pyo
+*.sh
+*.npy
+*.swp
+*.csv
+*.log
