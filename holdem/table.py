@@ -1,8 +1,6 @@
 import time
 import uuid
 from threading import Thread, Lock
-import xmlrpc.client
-from xmlrpc.server import SimpleXMLRPCServer
 
 from deuces.deuces import Card, Deck, Evaluator
 from .player import Player
@@ -11,9 +9,7 @@ class Table(object):
     BLIND_INCREMENTS = [[10,25],[25,50],[50,100],[75,150],[100,200],[150,300],[200,400],[300,600],[400,800],[500,10000],[600,1200],[800,1600],[1000,2000]]
 
     def __init__(self, instance_num, seats = 8, quiet = False, training = False):
-
-        self.host = '0.0.0.0'
-        self.port = 8000 + instance_num * 10
+        self.instance_num = instance_num
         self._blind_index = 0
         [self._smallblind, self._bigblind] = Table.BLIND_INCREMENTS[0]
         self._deck = Deck()
@@ -37,8 +33,6 @@ class Table(object):
         self.emptyseats = seats
         self._player_dict = {}
 
-        self.teacher = xmlrpc.client.ServerProxy('http://0.0.0.0:' + str(8000 + instance_num * 100))
-
         self._quiet = quiet
         self._training = training
         self._run_thread = Thread(target = self.run, args=())
@@ -51,6 +45,7 @@ class Table(object):
             self.run_game()
 
     def run_game(self):
+        #print("running game", self.instance_num)
         self.ready_players()
         # for p in self._seats:
         #     print('Player ',p.playerID, ' playing hand: ', p.playing_hand, 'sitting out', p.sitting_out)
@@ -63,31 +58,37 @@ class Table(object):
         [self._smallblind, self._bigblind] = Table.BLIND_INCREMENTS[0]
 
         # keep playing until there's a single player (shotgun style)
+
+        winner_id = None
         while(self.emptyseats < len(self._seats)-1):
             # answer = input('Press [enter] to start a game:')
             # if not answer:
-            self.start_hand(players)
-            self._number_of_hands += 1
+
             if not self._quiet:
                 print('Starting game number: ', self._number_of_hands)
                 for p in self._seats:
                     if p.playing_hand:
                         print('Player ',p.playerID, ' stack size: ', p.stack)
 
+            self.start_hand(players)
+            self._number_of_hands += 1
+
+            #print("players left", len([p for p in players if p.playing_hand]))
             # increment blinds every 15 hands (based on avg hands/hour of 30)
             if (self._number_of_hands % 15) == 0 and self._number_of_hands < 60:
                 self.increment_blinds()
 
 
             if len([p for p in players if p.playing_hand]) == 1:
+                #print("winner found!")
                 winner = [p for p in players if p.playing_hand][0]
-                if self._training:
-                    self.teacher.add_winner(winner.server.get_ai_id())
+                winner_id = winner.get_ai_type()
                 break
 
             if self._number_of_hands == 200:
                 print('no winner in 200 hands')
                 break
+        return winner_id
 
     def start_hand(self, players):
         players = [p for p in players if p.playing_hand]
@@ -115,7 +116,7 @@ class Table(object):
                 self.turn()
             elif self._round ==3:
                 self.river()
-
+            #print("round", self._round)
             folded_players = []
             while not player.playedthisround and len([p for p in players if not p.isallin]) >=1:
                 if player.isallin:
@@ -123,8 +124,8 @@ class Table(object):
                     player = self._next(players, player)
                     continue
                 # print('requesting move from ',player.playerID)
-                move = player.server.player_move(self.output_state(player))
-
+                #print("before", player.hand)
+                move = player.player_move(self.output_state(player))
                 if move[0] == 'call':
                     self.player_bet(player, self._tocall)
                     if not self._quiet:
@@ -154,14 +155,12 @@ class Table(object):
                     # break if a single player left
                     if len(players) ==1:
                         break
-
             player = self._first_to_act(players)
             self.resolve_sidepots(players + folded_players)
             self.new_round()
             if not self._quiet:
                 print('totalpot', self._totalpot)
             assert sum([p.stack for p in self._seats]) + self._totalpot == 2000*len(self._seats)
-
         self.resolve_game(players)
         self.reset()
 
@@ -224,9 +223,9 @@ class Table(object):
         self._discard.append(self._deck.draw(1)) #burn
         self.community.append(self._deck.draw(1))
 
-    def add_player(self, host, port, playerID, name, stack):
+    def add_player(self, playerID, emptyplayer = False, ai_flag = False, ai_type = -1, weights = None, biases = None, stack = 2000):
         if playerID not in self._player_dict:
-            new_player = Player(host, port, playerID, name, stack)
+            new_player = Player(playerID, emptyplayer, ai_flag, ai_type, weights, biases, stack)
             for i,player in enumerate(self._seats):
                 if player.emptyplayer:
                     self._seats[i] = new_player
@@ -236,11 +235,18 @@ class Table(object):
             self.emptyseats -= 1
 
     def ready_players(self):
+
+        '''
         if len([p for p in self._seats if not p.emptyplayer and p.sitting_out]) == len(self._seats):
             for p in self._seats:
                 if not p.emptyplayer:
                     p.sitting_out = False
                     p.playing_hand = True
+        '''
+        for p in self._seats:
+            p.sitting_out = False
+            p.playing_hand = True
+        #print("Players READY")
 
     def remove_player(self, playerID):
         try:
@@ -297,6 +303,7 @@ class Table(object):
         else:
             # compute hand ranks
             for player in players:
+                #print(player.hand, self.community)
                 player.handrank = self._evaluator.evaluate(player.hand, self.community)
 
             # trim side_pots to only include the non-empty side pots
@@ -351,24 +358,11 @@ class Table(object):
         'lastraise':self._lastraise,
         'minraise':max(self._bigblind, self._lastraise + self._tocall)}
 
-class TableProxy(object):
-    def __init__(self, table):
-        self._table = table
-        self.server = SimpleXMLRPCServer((self._table.host, self._table.port), logRequests=False, allow_none=True)
-        self.server.register_instance(self, allow_dotted_names=True)
-        Thread(target=self.server.serve_forever).start()
+    def reset_stacks(self):
+        for player in self._seats:
+            player.reset_stack()
 
-    def get_table_state(self, playerID):
-        return self._table.output_state(table._player_dict.get(playerID, None))
-
-    def add_player(self, host, port, playerID, name, stack):
-        self._table.add_player(host, port, playerID, name, stack)
-
-    def remove_player(self, playerID):
-        self._table.remove_player(playerID)
-
-    def run_game(self):
-        self._table.run_game()
-
-    def run_forever(self):
-        self._table.start()
+    def get_ai(self):
+        for player in self._seats:
+            if player.get_ai_type() == 0:
+                return player.ai

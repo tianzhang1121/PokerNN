@@ -1,4 +1,5 @@
 from deuces.deuces import Deck, Card, Evaluator
+import random
 
 # hand strength estimator (same class as in https://github.com/neynt/pokertude but uses Deuces Deck, Card and Evaluator classes for the inner workings)
 class Analyzer:
@@ -20,6 +21,8 @@ class Analyzer:
         self.monte_carlo_rounds = n
 
     def set_pocket_cards(self, card1, card2):
+        #print("card1", card1)
+        #print("card2", card2)
         self.deck.remove(card1)
         self.deck.remove(card2)
         self.hole_cards.append(card1)
@@ -42,7 +45,7 @@ class Analyzer:
         for _ in range(self.monte_carlo_rounds):
             # Draw a uniformly random combination of unseen cards (remaining
             # community cards + 2 hole cards per opponent)
-            drawn_cards = self.deck.sample(to_draw)
+            drawn_cards = random.sample(self.deck.cards, to_draw)
             all_comms = self.community_cards + drawn_cards[:to_flop]
             my_ranking = self._evaluator.evaluate(self.hole_cards, all_comms)
 
@@ -50,7 +53,7 @@ class Analyzer:
             winner = 2
             for i in range(self.num_opponents):
                 their_cards = drawn_cards[to_flop+2*i:to_flop+2*i+2]
-                their_ranking =self._evaluator.evaluate(their_cards, all_comms)
+                their_ranking = self._evaluator.evaluate(their_cards, all_comms)
                 if my_ranking > their_ranking:
                     winner = 0
                 elif my_ranking == their_ranking:

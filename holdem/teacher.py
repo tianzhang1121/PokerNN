@@ -3,97 +3,54 @@ import random
 import uuid
 
 from collections import OrderedDict
-from threading import Thread, Lock
-from xmlrpc.server import SimpleXMLRPCServer
+from multiprocessing import Process, Queue
 
-from .table import Table, TableProxy
+from .table import Table
 from .nn import NeuralNetwork
-from .playercontrol import PlayerControl, PlayerControlProxy
 
-class Teacher(Thread):
-    def __init__(self, instance_num, seats, n_games, quiet = False, weights = None, biases = None):
+class Teacher(Process):
+    def __init__(self, queue, instance_num, seats, n_games, quiet = False, weights = None, biases = None):
         super(Teacher, self).__init__()
-
+        self.queue = queue
         self.instance_num = instance_num
         self.seats = seats
         self.n_games = n_games
-        self.host = '0.0.0.0'
-        self.port = 8000 + instance_num * 100
-        self.table = TableProxy(Table(instance_num, seats, quiet, True))
-        self.players = []
-
+        self.table = Table(instance_num, seats, quiet, True)
+        #self.players = []
+        #self.wins = 0
         self.add_checkcallbot()
         self.add_nncontroller(weights, biases)
         for i in range(3, seats+1):
             self.add_randombot(i)
 
     def run(self):
+        #print(self.instance_num)
         games_played = 0
-
+        wins = 0
         while games_played < self.n_games:
-            self.reset_game()
-            self.table.run_game()
+            self.table.reset_stacks()
+            winner = self.table.run_game()
+            if winner == 0:
+                wins += 1
             games_played += 1
-        self.end_game()
-        print('finished')
-
-    # cleanup
-    '''
-    def add_winner(self, winner_uuid):
-    '''
-    '''
-    def child(self, p1, p2):
-        child_uuid = uuid.uuid4()
-        try:
-            weight1 = np.load(NeuralNetwork.SAVE_DIR + p1 + '_weights.npy')
-            weight2 = np.load(NeuralNetwork.SAVE_DIR + p2 + '_weights.npy')
-            biases1 = np.load(NeuralNetwork.SAVE_DIR + p1 + '_biases.npy')
-            biases2 = np.load(NeuralNetwork.SAVE_DIR + p2 + '_biases.npy')
-
-            child_weights = average_arrays(weight1, weight2)
-            child_biases = average_arrays(biases1, biases2)
-
-            np.save(NeuralNetwork.SAVE_DIR + str(child_uuid) + '_weights.npy', child_weights)
-            np.save(NeuralNetwork.SAVE_DIR + str(child_uuid) + '_biases.npy', child_biases)
-        except:
-            pass
-
-        return child_uuid
-    '''
-    def end_game(self):
-        for p in self.players:
-            p.quit()
-
-    def reset_game(self):
-        for p in self.players:
-            p.rejoin()
+        fitness = 1.0 - (wins / self.n_games)
+        self.queue.put([fitness, self.get_weights(), self.get_biases()])
+        print("finished playing an instance")
+        #print(fitness)
+        #print("instance_num" + str(self.instance_num) + ":" + str(wins))
 
     def add_checkcallbot(self):
-        self.players.append(PlayerControlProxy(PlayerControl('localhost', self.port+1, 2, instance_num, True, 2)))
+        self.table.add_player(2, False, True, 2)
 
     def add_randombot(self, i):
         # random bot
-        self.players.append(PlayerControlProxy(PlayerControl('localhost', self.port+i, i, instance_num, True, 3)))
+        self.table.add_player(i, False, True, 3)
 
     def add_nncontroller(self, weights = None, biases = None):
-        self.players.append(PlayerControlProxy(PlayerControl('localhost', self.port+2, 0, instance_num, True, 0, weights, biases)))
+        self.table.add_player(0, False, True, 0, weights, biases)
 
-class TeacherProxy(object):
-    def __init__(self, teacher):
-        self._quit = False
+    def get_weights(self):
+        return self.table.get_ai().get_weights()
 
-        self._teacher = teacher
-        self.server = SimpleXMLRPCServer((self._teacher.host, self._teacher.port), logRequests=False, allow_none=True)
-        self.server.register_instance(self, allow_dotted_names=True)
-        Thread(target = self.run).start()
-
-    def run(self):
-        while not self._quit:
-            self.server.handle_request()
-
-    def quit(self):
-        self._quit = true
-    '''
-    def add_winner(self, winner_uuid):
-        self._teacher.add_winner(winner_uuid)
-    '''
+    def get_biases(self):
+        return self.table.get_ai().get_biases()

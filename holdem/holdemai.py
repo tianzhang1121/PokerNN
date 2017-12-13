@@ -32,6 +32,7 @@ class HoldemAI(NeuralNetwork):
         players = [[i for i in j] for j in players]
 
         # setup analyzer
+        #print(hand)
         self.analyzer.set_num_opponents(sum([1 for p in players if p[2]]))
         self.analyzer.set_pocket_cards(*hand)
         for card in community:
@@ -134,6 +135,12 @@ class HoldemAI(NeuralNetwork):
                 return ('raise', bet_size)
             else:
                 return ('check', 0)
+
+    def get_weights(self):
+        return self.weights
+
+    def get_biases(self):
+        return self.biases
 
     # takes card from deuces Card class (reprsented by int) and gives its 29 digit binary representation in a list, first 3 bits are unused
     @staticmethod

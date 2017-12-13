@@ -254,3 +254,4 @@ class PlayerControlProxy(object):
     def quit(self):
         self._player.server.remove_player(self._player.playerID)
         self._quit = True
+        self.server.server_close()

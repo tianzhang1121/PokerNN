@@ -26,6 +26,9 @@ class Deck:
             cards.append(self.draw())
         return cards
 
+    def remove(self, card):
+        self.cards.remove(card)
+
     def __str__(self):
         return Card.print_pretty_cards(self.cards)
 
