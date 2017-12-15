@@ -24,23 +24,51 @@ if __name__=='__main__':
     quiet = args.quiet
     fitness_threshold = args.fitness_threshold
 
-    retain_prob = 0.4
-    rand_select = 0.1
+    retain_prob = 0.2
+    rand_select = 0.15
     mutate_prob = 0.2
     mutate_gene_prob = 0.05
 
-    '''
-    inputfile = open("fitness_0.0_gen_1.pickle", "rb")
-    prev_results = pickle.load(inputfile)
-    '''
+    
+    inputfile1 = open("fitness_0.7_gen_6_of_50.pickle", "rb")
+    #inputfile2 = open("fitness_0.7_gen_26_of_50.pickle", "rb")
+    #inputfile3 = open("fitness_0.6666666666666667_gen_0_of_50.pickle", "rb")
+    prev_results1 = pickle.load(inputfile1)
+    #prev_results2 = pickle.load(inputfile2)
+    #prev_results3 = pickle.load(inputfile3)
+
     #create initial population and get their fitness
     print("creating and running initial pop.")
     teachers = []
     q = Queue()
+    for result in prev_results1:
+        if len(teachers) == n_instances:
+            break
+        teachers.append(Teacher(q, 0, seats, n_games, quiet, result[1], result[2]))
+
+    '''
+    for result in prev_results2:
+        if len(teachers) == n_instances:
+            break
+        if result[0] <= 0.7:
+            teachers.append(Teacher(q, 0, seats, n_games, quiet, result[1], result[2]))
+    for result in prev_results3:
+        if len(teachers) == n_instances:
+            break
+        if result[0] <= 0.7:
+            teachers.append(Teacher(q, 0, seats, n_games, quiet, result[1], result[2]))
+    '''
+    remaining = n_instances - len(teachers)
+    for i in range(remaining):
+        teachers.append(Teacher(q, i, seats, n_games, quiet))
+    
+    for teacher in teachers:
+        teacher.start()
+    '''
     for i in range(n_instances):
         teachers.append(Teacher(q, i, seats, n_games, quiet))
         teachers[i].start()
-
+    '''
     results = []
     for i in range(n_instances):
         results.append(q.get())
@@ -65,7 +93,8 @@ if __name__=='__main__':
         for result in results[retain_len:]:
             if rand_select > random.random():
                 mutations += 1
-                parents.append(Teacher(q, 0, seats, n_games, quiet, result[1], result[2]))
+                #parents.append(Teacher(q, 0, seats, n_games, quiet, result[1], result[2]))
+                parents.append(Teacher(q, 0, seats, n_games, quiet))
         print("total mutations for this gen: ", mutations)
         parents_len = len(parents)
         to_fill = n_instances - parents_len
