@@ -59,7 +59,7 @@ class Table(object):
 
         # keep playing until there's a single player (shotgun style)
 
-        winner_id = None
+        place = 1
         while(self.emptyseats < len(self._seats)-1):
             # answer = input('Press [enter] to start a game:')
             # if not answer:
@@ -77,18 +77,33 @@ class Table(object):
             # increment blinds every 15 hands (based on avg hands/hour of 30)
             if (self._number_of_hands % 15) == 0 and self._number_of_hands < 60:
                 self.increment_blinds()
-
-
+            
             if len([p for p in players if p.playing_hand]) == 1:
                 #print("winner found!")
                 winner = [p for p in players if p.playing_hand][0]
-                winner_id = winner.get_ai_type()
+                if winner.get_ai_type() == 0:
+                    place = 1
+                else:
+                    place = 2
                 break
+            else:
+                found = False
+                for p in players:
+                    if p.get_ai_type() == 0 and p.playing_hand:
+                        found = True
+                        break
+                if not found:
+                    player_left = 0
+                    for p in players:
+                        if p.playing_hand == True:
+                            player_left += 1
+                    place = player_left + 1
+                    break
 
             if self._number_of_hands == 200:
                 print('no winner in 200 hands')
                 break
-        return winner_id
+        return place
 
     def start_hand(self, players):
         players = [p for p in players if p.playing_hand]

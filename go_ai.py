@@ -24,18 +24,18 @@ if __name__=='__main__':
     quiet = args.quiet
     fitness_threshold = args.fitness_threshold
 
-    retain_prob = 0.2
+    retain_prob = 0.3
     rand_select = 0.15
-    mutate_prob = 0.2
+    mutate_prob = 0.25
     mutate_gene_prob = 0.05
 
     
     inputfile1 = open("fitness_0.7_gen_6_of_50.pickle", "rb")
-    #inputfile2 = open("fitness_0.7_gen_26_of_50.pickle", "rb")
-    #inputfile3 = open("fitness_0.6666666666666667_gen_0_of_50.pickle", "rb")
+    inputfile2 = open("fitness_0.7_gen_26_of_50.pickle", "rb")
+    inputfile3 = open("fitness_0.6666666666666667_gen_0_of_50.pickle", "rb")
     prev_results1 = pickle.load(inputfile1)
-    #prev_results2 = pickle.load(inputfile2)
-    #prev_results3 = pickle.load(inputfile3)
+    prev_results2 = pickle.load(inputfile2)
+    prev_results3 = pickle.load(inputfile3)
 
     #create initial population and get their fitness
     print("creating and running initial pop.")
@@ -45,8 +45,6 @@ if __name__=='__main__':
         if len(teachers) == n_instances:
             break
         teachers.append(Teacher(q, 0, seats, n_games, quiet, result[1], result[2]))
-
-    '''
     for result in prev_results2:
         if len(teachers) == n_instances:
             break
@@ -57,7 +55,7 @@ if __name__=='__main__':
             break
         if result[0] <= 0.7:
             teachers.append(Teacher(q, 0, seats, n_games, quiet, result[1], result[2]))
-    '''
+    
     remaining = n_instances - len(teachers)
     for i in range(remaining):
         teachers.append(Teacher(q, i, seats, n_games, quiet))
@@ -84,7 +82,7 @@ if __name__=='__main__':
         results = [result for result in sorted(results, key = lambda x: x[0])]
         print("starting fitness of instances in this population:")
         for result in results:
-            print(result[0])
+            print(result[0], " - ", result[3])
         retain_len = int(retain_prob * n_instances)
         parents = []
         for i in range(retain_len):

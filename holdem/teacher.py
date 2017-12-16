@@ -26,15 +26,17 @@ class Teacher(Process):
     def run(self):
         #print(self.instance_num)
         games_played = 0
+        val = 0
         wins = 0
         while games_played < self.n_games:
             self.table.reset_stacks()
-            winner = self.table.run_game()
-            if winner == 0:
+            place = self.table.run_game()
+            if place == 1:
                 wins += 1
+            val += (1.0 / float(place)) 
             games_played += 1
-        fitness = 1.0 - (wins / self.n_games)
-        self.queue.put([fitness, self.get_weights(), self.get_biases()])
+        fitness = 1.0 - (val / self.n_games)
+        self.queue.put([fitness, self.get_weights(), self.get_biases(), wins])
         print("finished playing an instance")
         #print(fitness)
         #print("instance_num" + str(self.instance_num) + ":" + str(wins))
